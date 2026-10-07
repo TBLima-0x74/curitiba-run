@@ -1,0 +1,27 @@
+# Dados — o pipeline re-baixa e recalcula tudo do zero
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+
+# Saídas pesadas
+reports/figures/*.png
+
+# Material privado de inspeção — fica só na máquina local
+reports/*.html
+inspecao_iac_respostas.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Ambiente
+.env
+.DS_Store
+Thumbs.db
