@@ -8,7 +8,7 @@ data/processed/*
 reports/figures/*.png
 
 # Material privado de inspeção — fica só na máquina local
-reports/*.html
+reports/validacoes/*.html
 inspecao_iac_respostas.md
 
 # Python

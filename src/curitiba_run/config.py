@@ -118,3 +118,37 @@ QUADRANTES = {
 }
 
 RANDOM_SEED = 42
+
+# ------------------------------------------------------------------ Bairros
+# Os 75 bairros oficiais de Curitiba. Conferidos contra a base da Guarda
+# Municipal: todos os 75 aparecem nela, e nenhum nome desta lista fica sem
+# registro. A comparação é feita sem acento e sem caixa (`chave_de_bairro`).
+BAIRROS_CURITIBA = (
+    "Abranches", "Água Verde", "Ahú", "Alto Boqueirão", "Alto da Glória",
+    "Alto da Rua XV", "Atuba", "Augusta", "Bacacheri", "Bairro Alto",
+    "Barreirinha", "Batel", "Bigorrilho", "Boa Vista", "Bom Retiro", "Boqueirão",
+    "Butiatuvinha", "Cabral", "Cachoeira", "Cajuru", "Campina do Siqueira",
+    "Campo Comprido", "Campo de Santana", "Capão da Imbuia", "Capão Raso",
+    "Cascatinha", "Caximba", "Centro", "Centro Cívico",
+    "Cidade Industrial de Curitiba", "Cristo Rei", "Fanny", "Fazendinha",
+    "Ganchinho", "Guabirotuba", "Guaíra", "Hauer", "Hugo Lange",
+    "Jardim Botânico", "Jardim das Américas", "Jardim Social", "Juvevê",
+    "Lamenha Pequena", "Lindóia", "Mercês", "Mossunguê", "Novo Mundo",
+    "Orleans", "Parolin", "Pilarzinho", "Pinheirinho", "Portão", "Prado Velho",
+    "Rebouças", "Riviera", "Santa Cândida", "Santa Felicidade",
+    "Santa Quitéria", "Santo Inácio", "São Braz", "São Francisco", "São João",
+    "São Lourenço", "São Miguel", "Seminário", "Sítio Cercado", "Taboão",
+    "Tarumã", "Tatuquara", "Tingui", "Uberaba", "Umbará", "Vila Izabel",
+    "Vista Alegre", "Xaxim",
+)
+
+# Grafias alternativas que designam um bairro oficial. Sem a primeira linha,
+# 11.639 registros da CIC (99,7% dos dela) — o maior bairro da cidade, e de baixa renda —
+# sumiriam em silêncio, e a CIC pareceria segura. Ver desafio 19.
+BAIRRO_ALIASES = {
+    "CIDADE INDUSTRIAL": "Cidade Industrial de Curitiba",
+    "CIC": "Cidade Industrial de Curitiba",
+}
+
+# 2022 só tem novembro e dezembro na base da Guarda Municipal.
+OCORRENCIAS_INICIO = "2023-01-01"

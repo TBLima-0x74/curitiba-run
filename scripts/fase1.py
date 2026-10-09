@@ -216,7 +216,7 @@ def main() -> int:
         log.info("  Salvo em %s", PROCESSED / f"iac_h3_r{H3_RESOLUCAO}.parquet")
 
     log.info("\nFase 1 concluída. Próximo passo: DEM e camadas do IPPUC "
-             "(ver reports/fase1_status.md).")
+             "(ver reports/status/fase1_status.md).")
     return 0
 
 

@@ -19,6 +19,6 @@ def geocodificar(df: pd.DataFrame, coluna_endereco: str = "logradouro") -> pd.Da
 def testar_vies_espacial(df: pd.DataFrame) -> pd.DataFrame:
     """Compara a taxa de sucesso da geocodificação entre bairros e decis de renda.
 
-    Devolve a tabela que entra em `reports/qualidade_dados_seguranca.md`.
+    Devolve a tabela que entra em `reports/validacoes/qualidade_dados_seguranca.md`.
     """
     raise NotImplementedError

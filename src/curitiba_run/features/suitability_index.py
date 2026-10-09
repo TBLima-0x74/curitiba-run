@@ -113,7 +113,7 @@ def avaliar_cenarios_de_peso(
 ) -> pd.DataFrame:
     """Calcula o IAC sob cada esquema de pesos. Uma coluna por cenário.
 
-    O resultado alimenta `reports/sensibilidade.md`: se o ranking de células
+    O resultado alimenta `reports/validacoes/sensibilidade.md`: se o ranking de células
     muda muito entre cenários, o índice não sustenta conclusões fortes e isso
     precisa ser dito.
     """

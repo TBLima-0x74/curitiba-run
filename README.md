@@ -113,10 +113,10 @@ Todas gratuitas, públicas e re-baixáveis por qualquer pessoa que clone o repos
 
 | Fonte | Conteúdo | Granularidade |
 |-------|----------|---------------|
-| [**SiGesGuarda**](https://dadosabertos.curitiba.pr.gov.br/conjuntodado/detalhe?chave=b16ead9d-835e-41e8-a4d7-dcc4f2b4b627) — Guarda Municipal | Ocorrências atendidas: natureza, endereço, data e hora | Ponto / endereço — **fonte primária** |
-| [SESP-PR / CAPE](https://www.seguranca.pr.gov.br/CAPE/Estatisticas) | Estatísticas criminais oficiais do estado | Agregada — validação e contexto |
+| [**SiGesGuarda**](https://dadosabertos.curitiba.pr.gov.br/conjuntodado/detalhe?chave=b16ead9d-835e-41e8-a4d7-dcc4f2b4b627) — Guarda Municipal | Ocorrências atendidas: natureza, subcategoria, bairro, rua, data e hora | **Bairro** — sem coordenada, e a rua vem sem número |
+| SESP-PR | Ocorrências policiais do estado | Solicitada via LAI, por bairro e mês; portal fora do ar |
 
-A base da Guarda Municipal é primária por ser georreferenciável no nível do ponto. A SESP cobre crimes de competência estadual que a GM não registra da mesma forma e entra como camada de checagem.
+A base da Guarda mede **onde a Guarda atua**, não onde há risco: ela protege patrimônio municipal e registra onde está. Por isso a camada que sai dela se chama "ocorrências registradas pela GM" até que a SESP-PR permita corrigir o viés. Uso autorizado pelo [ADR 0004](docs/adr/0004-base-legal-dados-de-ocorrencias.md).
 
 ### 4.3 População e renda
 
@@ -151,7 +151,7 @@ Cada dimensão é normalizada, e o índice é a média ponderada delas. **A esco
 
 ### 5.3 A superfície de risco
 
-Densidade de ocorrências por célula, normalizada por área e por população, desagregada pela taxonomia de naturezas construída na Fase 2. Estimativa por densidade kernel para suavizar o ruído de células pequenas, com suavização bayesiana empírica onde a exposição é baixa.
+Gravidade das ocorrências **por bairro**, em taxa por habitante. Cada ocorrência pesa a pena mínima do seu tipo no Código Penal, normalizada de 0 a 1 ([ADR 0005](docs/adr/0005-peso-de-gravidade-pela-pena-minima.md)). Como a base não tem coordenada, cada hexágono H3 herda a nota do bairro que ocupa a maior parte dele. O detalhe está em [`docs/taxonomia_ocorrencias.md`](docs/taxonomia_ocorrencias.md).
 
 ### 5.4 Combinação: acesso a espaço seguro
 
@@ -228,7 +228,7 @@ Essa segunda leitura é o que responde P3 de forma direta e comunicável.
 - `src/features/suitability_index.py`
 - `data/processed/iac_h3_r9.parquet`
 - `docs/indice_adequacao.md` — dimensões, fórmula, pesos e limitações
-- `reports/validacao_iac.md` — a inspeção da amostra, com imagens
+- `reports/validacoes/validacao_iac.md` — a inspeção da amostra, com imagens
 
 **Critério de saída:** índice calculado para todas as células habitadas, com validação visual documentada e desacordos explicados.
 
@@ -236,25 +236,24 @@ Essa segunda leitura é o que responde P3 de forma direta e comunicável.
 
 ### Fase 2 — Dados de segurança pública
 
-**Objetivo:** base limpa e georreferenciada de ocorrências. *(Independente da Fase 1.)*
+**Objetivo:** uma camada de risco por bairro, comparável com o IAC. *(Independente da Fase 1.)* Situação atual em [`reports/status/fase2_status.md`](reports/status/fase2_status.md).
 
 **Atividades**
 
-- Baixar as bases SiGesGuarda de forma programática e reprodutível.
-- Padronizar esquemas entre períodos — nomes de colunas e naturezas mudam ao longo do tempo.
-- **Geocodificar** registros sem coordenadas a partir de logradouro e numeração; medir e reportar a taxa de sucesso.
-- Consolidar a **taxonomia de naturezas** em classes analíticas estáveis.
-- **Testar se a falha de geocodificação é espacialmente enviesada** — se endereços de certas regiões falham mais, isso contamina toda a análise (risco R2).
-- Extrair as estatísticas da SESP-PR como validação agregada.
+- Padronizar a base da Guarda Municipal — nomes de bairro, categorias, esquema — com testes de contrato.
+- Filtrar as ocorrências que atingem uma pessoa na rua e pesá-las pela gravidade.
+- Dividir pela população do Censo por bairro, e classificar cada bairro em alto/baixo.
+- Medir quanto da nota de cada bairro é presença da Guarda.
+- Obter os dados da SESP-PR via LAI e usá-los para corrigir esse viés.
 
 **Entregáveis**
 
-- `src/ingestion/sigesguarda.py`, `sesp.py`
-- `data/processed/ocorrencias.parquet`
-- `docs/taxonomia_ocorrencias.md`
-- `reports/qualidade_dados_seguranca.md` com o teste de viés espacial
+- `src/curitiba_run/ingestion/sigesguarda.py`, `features/gravidade.py` e `scripts/fase2_ocorrencias.py`
+- `data/processed/ocorrencias_gm_por_bairro.csv`
+- `docs/taxonomia_ocorrencias.md` e ADRs 0004 e 0005
+- `reports/validacoes/qualidade_dados_seguranca.md` com o teste do viés de presença da Guarda
 
-**Critério de saída:** base georreferenciada com taxa de sucesso documentada e viés espacial da geocodificação testado e reportado.
+**Critério de saída:** camada de risco por bairro, por habitante, com classe alto/baixo e com o viés de presença da Guarda medido — corrigido pela SESP-PR se a resposta vier, ou declarado como limitação se não vier.
 
 ---
 
@@ -322,7 +321,7 @@ Essa segunda leitura é o que responde P3 de forma direta e comunicável.
 - `notebooks/02_equidade.ipynb`, `03_modelagem.ipynb`
 - `src/analysis/equity.py`, `models.py`
 - `reports/resultados.md`
-- `reports/sensibilidade.md`
+- `reports/validacoes/sensibilidade.md`
 
 **Critério de saída:** H5 testada com resultado explícito, e conclusões estáveis entre esquemas de peso e escalas — ou a instabilidade documentada como achado.
 
@@ -372,97 +371,120 @@ Essa segunda leitura é o que responde P3 de forma direta e comunicável.
 
 ## 7. Estrutura do repositório
 
+Itens marcados como *planejado* ainda não existem: estão no desenho das fases seguintes.
+
 ```
-projeto-corrida-seguranca-curitiba/
+curitiba-run/
 ├── README.md
 ├── LICENSE
-├── .gitignore
 ├── pyproject.toml
-├── Makefile                        # pipeline ponta a ponta
+├── Makefile                          # atalhos opcionais — make help
+├── .pre-commit-config.yaml
+├── .github/workflows/ci.yml          # lint e testes a cada push
 │
-├── data/
-│   ├── raw/                        # imutável, nunca editado à mão
+├── scripts/                          # pontos de entrada, um por etapa
+│   ├── fase1.py                      # limite → malhas H3 → GeoCuritiba → OSM → IAC
+│   └── fase2_ocorrencias.py          # ocorrências da Guarda → tabela por bairro
+│
+├── src/curitiba_run/                 # o pacote: toda a lógica, testável
+│   ├── config.py                     # caminhos, pesos do IAC, os 75 bairros oficiais
+│   ├── ingestion/
+│   │   ├── osm.py                    # rede caminhável e espaços dedicados (osmnx)
+│   │   ├── geocuritiba.py            # postes, MDT e áreas verdes do IPPUC
+│   │   ├── ippuc.py                  # limite municipal
+│   │   ├── sigesguarda.py            # ocorrências da Guarda Municipal
+│   │   ├── sesp.py                   # bloqueado até o ADR da SESP-PR (pedido via LAI)
+│   │   ├── ibge.py
+│   │   └── dem.py
+│   ├── processing/
+│   │   ├── grid.py                   # malha H3 com verificação de cobertura
+│   │   ├── accessibility.py          # distância em rede
+│   │   ├── geocoding.py              # sem uso por ora: a base da Guarda não tem número
+│   │   └── spatial_join.py
+│   ├── features/
+│   │   ├── dimensions.py             # as cinco dimensões do IAC
+│   │   ├── suitability_index.py      # normalização, composição e robustez alto/baixo
+│   │   ├── gravidade.py              # peso de cada ocorrência pela pena mínima
+│   │   ├── risk_surface.py
+│   │   └── typology.py               # quadrantes IAC × risco
+│   ├── analysis/                     # Moran/LISA, equidade, modelos
+│   └── viz/                          # mapas e gráficos
+│
+├── tests/                            # verificados contra uma cidade sintética
+│   ├── fixtures/cidade_sintetica.py
+│   ├── test_grid.py
+│   ├── test_osm.py
+│   ├── test_geocuritiba.py
+│   ├── test_dimensions.py
+│   ├── test_suitability_index.py
+│   ├── test_typology.py
+│   ├── test_equity.py
+│   ├── test_gravidade.py
+│   └── test_sigesguarda.py
+│
+├── data/                             # nada aqui vai para o Git
+│   ├── raw/                          # como baixado, nunca editado à mão
 │   │   ├── osm/
 │   │   ├── ippuc/
 │   │   ├── sigesguarda/
 │   │   ├── sesp/
 │   │   ├── ibge/
 │   │   └── dem/
-│   ├── interim/
-│   └── processed/                  # tabelas analíticas finais
-│
-├── src/
-│   ├── config.py                   # caminhos, constantes, parâmetros do índice
-│   ├── ingestion/
-│   │   ├── osm.py                  # extração via osmnx / Overpass
-│   │   ├── ippuc.py
-│   │   ├── sigesguarda.py
-│   │   ├── sesp.py
-│   │   ├── ibge.py
-│   │   └── dem.py
-│   ├── processing/
-│   │   ├── grid.py                 # malha H3
-│   │   ├── geocoding.py
-│   │   ├── accessibility.py        # distância em rede
-│   │   └── spatial_join.py
-│   ├── features/
-│   │   ├── suitability_index.py    # o IAC
-│   │   ├── risk_surface.py
-│   │   └── typology.py             # quadrantes
-│   ├── analysis/
-│   │   ├── spatial_stats.py        # Moran, LISA, matrizes W
-│   │   ├── equity.py               # Lorenz, concentração
-│   │   └── models.py               # Poisson/NB, SAR, SEM
-│   └── viz/
-│       ├── maps.py
-│       └── charts.py
-│
-├── notebooks/
-│   ├── 00_exploracao_fontes.ipynb
-│   ├── 01_eda_espacial.ipynb
-│   ├── 02_equidade.ipynb
-│   └── 03_modelagem.ipynb
-│
-├── tests/
-│   ├── test_grid.py
-│   ├── test_suitability_index.py
-│   ├── test_accessibility.py
-│   └── test_spatial_join.py
-│
-├── reports/
-│   ├── figures/
-│   ├── validacao_iac.md
-│   ├── qualidade_dados_seguranca.md
-│   ├── resultados.md
-│   ├── sensibilidade.md
-│   ├── relatorio_final.md
-│   └── mapa_interativo.html
+│   ├── interim/                      # cache do osmnx e arquivos temporários
+│   └── processed/                    # malhas H3, IAC, ocorrências por bairro
 │
 ├── docs/
-│   ├── viabilidade.md
-│   ├── indice_adequacao.md
-│   ├── taxonomia_ocorrencias.md
-│   ├── estrategia_dados_atividade.md   # histórico da decisão sobre Strava
-│   └── adr/                        # 0001 malha H3 · 0002 sem Strava · 0003 alto/baixo
+│   ├── indice_adequacao.md           # método da Fase 1: o IAC
+│   ├── taxonomia_ocorrencias.md      # método da Fase 2: ocorrências e pesos
+│   ├── desafios.md                   # onde o projeto quase deu errado
+│   ├── estrategia_dados_atividade.md # histórico da saída da Strava
+│   └── adr/                          # uma decisão por arquivo
+│       ├── 0001-malha-h3.md
+│       ├── 0002-sem-dependencia-strava.md
+│       ├── 0003-alto-baixo-como-unidade-de-comunicacao.md
+│       ├── 0004-base-legal-dados-de-ocorrencias.md
+│       └── 0005-peso-de-gravidade-pela-pena-minima.md
 │
-└── .github/workflows/ci.yml
+├── reports/
+│   ├── status/                       # situação de cada fase e backlog
+│   │   ├── fase1_status.md
+│   │   └── fase2_status.md
+│   ├── validacoes/                   # evidência de que o cálculo mede o que diz
+│   │   ├── validacao_iac.md
+│   │   ├── qualidade_dados_seguranca.md   # planejado
+│   │   └── sensibilidade.md               # planejado
+│   ├── figures/
+│   ├── resultados.md                 # planejado
+│   ├── relatorio_final.md            # planejado
+│   └── mapa_interativo.html          # planejado
+│
+└── notebooks/                        # exploração, a partir da Fase 4
 ```
+
+### Como a documentação se organiza
+
+- **`README.md`** — o que é o projeto, e o mapa para o resto.
+- **`docs/` com um documento de método por fase** — como cada coisa é calculada hoje. Muda junto com o código.
+- **`docs/adr/`** — uma decisão por arquivo, com as alternativas rejeitadas. Não se reescreve: decisão nova vira ADR novo.
+- **`docs/desafios.md`** — os problemas que quase passaram, e o que cada um ensinou.
+- **`reports/status/`** — onde cada fase está e o que falta. **`reports/validacoes/`** — as evidências que fecham cada critério de saída.
 
 ### Política de dados
 
-- `data/raw/` e `data/interim/` não vão para o Git.
-- `data/processed/` entra se for agregado e leve — o repositório deve ser clonável sem LFS.
-- O `Makefile` re-baixa tudo do zero. **Nenhum dado do projeto depende de acesso privilegiado.**
+- `data/raw/`, `data/interim/` e `data/processed/` não vão para o Git. Os scripts recriam tudo a partir das fontes públicas.
+- **Dado de ocorrência nunca é publicado bruto** — só agregado, e com supressão de contagens baixas ([ADR 0004](docs/adr/0004-base-legal-dados-de-ocorrencias.md)).
+- O material de inspeção manual (`reports/validacoes/*.html`) é privado e fica só na máquina local.
+- **Nenhum dado do projeto depende de acesso privilegiado** — com a exceção declarada da SESP-PR, solicitada via LAI.
 
 ---
 
 ## Desafios
 
-O registro dos obstáculos que mudaram o projeto está em [`docs/desafios.md`](docs/desafios.md) — dezoito deles, com o que cada um ensinou.
+O registro dos obstáculos que mudaram o projeto está em [`docs/desafios.md`](docs/desafios.md) — dezenove deles, com o que cada um ensinou.
 
 Vale a leitura por um motivo específico: **nenhum desses defeitos se manifestou como erro.** A licença da Strava não gerou exceção; a métrica sem janela temporal teria somado normalmente; três dimensões quebradas do índice devolveram 4.508 valores bem-comportados; a malha que perdia 1% do município fechava todas as contas. Só a serialização do Parquet realmente quebrou — e foi o mais fácil de corrigir.
 
-O que encontrou os outros nove foi ler a licença, checar a correlação entre dimensões, conferir somas de controle e perguntar em que direção cada erro empurraria o resultado. Nada disso aparece num pipeline verde.
+O que encontrou os outros dezoito foi ler a licença, checar a correlação entre dimensões, conferir somas de controle e perguntar em que direção cada erro empurraria o resultado. Nada disso aparece num pipeline verde.
 
 ---
 
@@ -483,6 +505,14 @@ As respostas do Overpass ficam em cache local, e a rede caminhável de Curitiba 
 ```bash
 python scripts/fase1.py --so-malha   # só as malhas, dispensa internet
 ```
+
+### Fase 2 — ocorrências
+
+```bash
+python scripts/fase2_ocorrencias.py
+```
+
+Lê a base da Guarda Municipal salva em `data/raw/sigesguarda/` (baixada do [Portal de Dados Abertos](https://dadosabertos.curitiba.pr.gov.br/)), mantém só as ocorrências de interesse, aplica o peso de gravidade e grava `data/processed/ocorrencias_gm_por_bairro.csv`. Não precisa de internet.
 
 ### Preparando o ambiente
 

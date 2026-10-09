@@ -252,6 +252,22 @@ Isso trouxe à tona um segundo defeito, latente, que só apareceria aí: `_prime
 
 E vale notar de onde veio: não de um teste, mas de levar a sério uma pergunta operacional de uma linha. "Basta rodar o script?" era a pergunta certa.
 
+## Parte 5 — Fase 2
+
+### 19. Três formas de uma ocorrência sumir sem erro
+
+A base da Guarda Municipal tinha três armadilhas, todas do mesmo tipo: dado que existe e desaparece no caminho sem nenhuma mensagem.
+
+**A CIC quase sumiu.** A base escreve o maior bairro da cidade de duas formas: "Cidade Industrial de Curitiba" e "CIDADE INDUSTRIAL". Comparando com a lista oficial dos 75 bairros, a segunda grafia não casava — e ela tinha **11.639 registros — 99,7% de todos os da CIC**; a grafia oficial aparece só 40 vezes. Sem um alias, o bairro mais populoso e um dos mais pobres de Curitiba apareceria quase sem ocorrências, ou seja, como **um dos mais seguros**. É o desafio 9 outra vez: perda concentrada num lugar só, e justamente na periferia.
+
+**Um espaço invisível apagava um crime.** "Importunação sexual" está gravada com espaço não separável (U+00A0) entre as palavras. Comparado com o texto digitado, não casava: as **339 ocorrências** sumiam do recorte. A limpeza de texto agora troca esse caractere antes de qualquer comparação, e um teste fixa o caso.
+
+**A própria Guarda virava risco.** Dos 228 disparos de arma registrados, **201 são da Guarda** — munição letal, menos letal ou dispositivo elétrico. Contados como ocorrência, eles transformariam a presença policial em perigo. Só os disparos de terceiros entram.
+
+Nos três casos o pipeline rodaria até o fim e entregaria uma tabela plausível.
+
+**O que ensinou:** comparar a base com uma referência externa — aqui, a lista oficial de bairros — é o que expõe o que falta. Olhar só o que casou nunca mostra o que não casou. E, de novo, vale perguntar em que direção a perda empurra o resultado: os três defeitos subestimariam o risco onde a hipótese do projeto espera encontrá-lo.
+
 ## O risco que continua aberto
 
 Nenhuma correção eliminou o **R1**, que segue sendo a ameaça central à validade.
@@ -266,10 +282,10 @@ A descoberta do ArcGIS Server público do IPPUC destravou a referência que falt
 
 ## O padrão
 
-Dezoito desafios, e a recorrência importa mais que qualquer um deles: **nenhum se manifestou como erro.**
+Dezenove desafios, e a recorrência importa mais que qualquer um deles: **nenhum se manifestou como erro.**
 
 A licença não gerou exceção. O `effort_count` sem janela teria somado normalmente. O viés da amostra produziria coeficientes com intervalo de confiança estreito. As três dimensões quebradas devolveram 4.508 valores bem-comportados. A malha com lacuna fechou todas as contas. Só o Parquet realmente quebrou — e foi o mais fácil de todos.
 
-O trabalho que encontrou os outros dezessete foi **ler a licença, checar a correlação entre dimensões, conferir somas de controle, perguntar em que direção cada erro empurraria o resultado — e olhar um lugar que se conhece e estranhar o número**. Nada disso aparece em um pipeline verde.
+O trabalho que encontrou os outros dezoito foi **ler a licença, checar a correlação entre dimensões, conferir somas de controle, perguntar em que direção cada erro empurraria o resultado — e olhar um lugar que se conhece e estranhar o número**. Nada disso aparece em um pipeline verde.
 
 É por isso que a Fase 1 incluía uma etapa de validação explícita, e por que ela consumiu mais tempo que a implementação.

@@ -1,8 +1,8 @@
 # Fase 1 — situação
 
-**Concluída.** O IAC está calculado para Curitiba com dados reais, as cinco dimensões passam no diagnóstico de redundância, e a inspeção visual que o critério de saída exigia foi feita: **25 de 25 células, 17 `confere`, 8 `parcial`, nenhum `não confere`** — com os dez IAC baixos conferindo todos, que é o extremo de que a hipótese H1 depende. Detalhe em [`validacao_iac.md`](validacao_iac.md).
+**Concluída.** O IAC está calculado para Curitiba com dados reais, as cinco dimensões passam no diagnóstico de redundância, e a inspeção visual que o critério de saída exigia foi feita: **25 de 25 células, 17 `confere`, 8 `parcial`, nenhum `não confere`** — com os dez IAC baixos conferindo todos, que é o extremo de que a hipótese H1 depende. Detalhe em [`validacao_iac.md`](../validacoes/validacao_iac.md).
 
-As três correções pendentes — `lit` desligada, `tertiary` e `busway` reclassificados, e `seguranca_viaria` renomeada para `transito_tranquilo` — **já estão nos números**: recalculado em 7/10 e verificado contra a rodada anterior. A tabela de verificação está em [`docs/indice_adequacao.md`](../docs/indice_adequacao.md).
+As três correções pendentes — `lit` desligada, `tertiary` e `busway` reclassificados, e `seguranca_viaria` renomeada para `transito_tranquilo` — **já estão nos números**: recalculado em 7/10 e verificado contra a rodada anterior. A tabela de verificação está em [`docs/indice_adequacao.md`](../../docs/indice_adequacao.md).
 
 > **Para recalcular, `python scripts/fase1.py` basta.** A etapa 5 passou a reaplicar a classificação viária a cada execução, em vez de lê-la do `arestas.parquet` — sem isso, a reclassificação de `tertiary` e `busway` não chegaria ao número, porque a etapa 4 pula o download que já existe. Ver desafio 18.
 
@@ -40,7 +40,7 @@ Diagnóstico: **VIF entre 1,00 e 1,19** — nenhuma dimensão tem mais de 17% da
 
 As duas dimensões mais mexidas são agora as mais independentes: `iluminacao` com VIF 1,01 e `transito_tranquilo` com 1,03.
 
-Detalhe completo de fórmulas, filtros e diagnósticos em [`docs/indice_adequacao.md`](../docs/indice_adequacao.md).
+Detalhe completo de fórmulas, filtros e diagnósticos em [`docs/indice_adequacao.md`](../../docs/indice_adequacao.md).
 
 ### Código
 
@@ -72,13 +72,13 @@ Detalhe completo de fórmulas, filtros e diagnósticos em [`docs/indice_adequaca
 
 É consequência direta da correção, não regressão. Dimensões redundantes produzem estabilidade espúria: se todas medem a mesma coisa, mudar o peso não altera o ranking. Ao eliminar a redundância, o peso passou a importar de verdade.
 
-Mudar os pesos não resolve — testado com três conjuntos diferentes, o piso fica inalterado, porque o par mais divergente não envolve o cenário base. A discussão completa está em [`docs/indice_adequacao.md`](../docs/indice_adequacao.md).
+Mudar os pesos não resolve — testado com três conjuntos diferentes, o piso fica inalterado, porque o par mais divergente não envolve o cenário base. A discussão completa está em [`docs/indice_adequacao.md`](../../docs/indice_adequacao.md).
 
 O piso é puxado pelo par `infraestrutura` × `percepção`, que discorda justamente em `transito_tranquilo` (0,15 contra 0,35) e em `iluminacao` (0,05 contra 0,30) — as duas dimensões que acabaram de ficar independentes. Quanto menos redundante a dimensão, mais o peso dela importa.
 
 Na prática, **70,4%** das células recebem a mesma classificação alto/baixo em todos os cenários, e **14,9%** se movem dois quartis ou mais.
 
-**Decidido:** o IAC é comunicado como `alto` / `baixo`, nunca como ranking contínuo, sempre acompanhado da contagem de cenários que concordam — [ADR 0003](../docs/adr/0003-alto-baixo-como-unidade-de-comunicacao.md). O contínuo segue no arquivo como insumo; o que muda é o que se afirma em público.
+**Decidido:** o IAC é comunicado como `alto` / `baixo`, nunca como ranking contínuo, sempre acompanhado da contagem de cenários que concordam — [ADR 0003](../../docs/adr/0003-alto-baixo-como-unidade-de-comunicacao.md). O contínuo segue no arquivo como insumo; o que muda é o que se afirma em público.
 
 | Concordância entre os 4 cenários | Células | % |
 |---|---:|---:|
@@ -88,13 +88,13 @@ Na prática, **70,4%** das células recebem a mesma classificação alto/baixo e
 
 **2.839 células (70,4%) são conclusão firme.** O limiar também foi testado: entre o percentil 40 e o 60, a fração de estáveis fica entre 70,0% e 72,6%.
 
-E o argumento de que as correções foram necessárias — apesar de cada uma ter derrubado a estabilidade — está escrito em [`docs/indice_adequacao.md`](../docs/indice_adequacao.md), seção "As correções foram necessárias". Em uma linha: a estabilidade mede quanto o resultado depende dos pesos, não se as dimensões medem o que dizem medir, e redundância produz estabilidade espúria.
+E o argumento de que as correções foram necessárias — apesar de cada uma ter derrubado a estabilidade — está escrito em [`docs/indice_adequacao.md`](../../docs/indice_adequacao.md), seção "As correções foram necessárias". Em uma linha: a estabilidade mede quanto o resultado depende dos pesos, não se as dimensões medem o que dizem medir, e redundância produz estabilidade espúria.
 
 ---
 
 ## A inspeção achou um defeito antes mesmo de começar
 
-A observação de que o Parque Barigui — um dos melhores lugares para correr da cidade — ficava no percentil 26 da `densidade_malha` veio de conhecer a cidade, não de teste. Levou à redução de peso acima, e está documentada em [`docs/desafios.md`](../docs/desafios.md), desafio 13.
+A observação de que o Parque Barigui — um dos melhores lugares para correr da cidade — ficava no percentil 26 da `densidade_malha` veio de conhecer a cidade, não de teste. Levou à redução de peso acima, e está documentada em [`docs/desafios.md`](../../docs/desafios.md), desafio 13.
 
 É o argumento a favor do critério de saída: nenhuma checagem interna acusaria, porque a dimensão estava coerente consigo mesma.
 
@@ -130,7 +130,7 @@ Os dois casos que eu havia marcado como "olhar com atenção redobrada" — Mare
 
 ## Pendente para fechar a fase
 
-- [x] `reports/validacao_iac.md` — inspeção visual de amostra estratificada, com os oito `parcial` explicados um a um. **Critério de saída cumprido.**
+- [x] `reports/validacoes/validacao_iac.md` — inspeção visual de amostra estratificada, com os oito `parcial` explicados um a um. **Critério de saída cumprido.**
 - [ ] Recalcular com as duas correções pendentes (`lit` desligada; `tertiary` e `busway` reclassificados) e reconferir os diagnósticos
 - [x] Mapa de robustez: `robustez_da_classificacao` grava `classe`, `n_alto` e `estavel` no parquet da Fase 1 — gravadas e conferidas em 7/10, coerentes com o IAC em todas as 4.508 células
 - [ ] Decidir se a declividade passa a ser medida ao longo das vias, em vez de média do terreno da célula

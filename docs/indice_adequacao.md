@@ -378,7 +378,7 @@ Dimensões redundantes produzem estabilidade espúria: se todas medem a mesma co
 
 **A distinção que fecha o argumento:** a estabilidade entre cenários mede *quanto o resultado depende dos pesos*. Ela não mede, e não pode medir, *se as dimensões medem o que dizem medir*. São duas propriedades diferentes, e otimizar a primeira à custa da segunda é escolher um número confortável em vez de um número verdadeiro. Um índice com cinco cópias da mesma variável teria estabilidade perto de 1,00 e não mediria nada.
 
-**E há evidência independente de que a direção está certa.** A inspeção visual de 25 células foi feita depois de as correções estarem especificadas, contra imagem de satélite e Street View: **17 `confere`, 8 `parcial`, nenhum `não confere`**, com os dez IAC baixos conferindo todos os dez — o extremo de que a hipótese H1 depende. Nenhum dos oito `parcial` é erro de cálculo; são limites de dado e de construto, todos registrados nas limitações. Ver [`../reports/validacao_iac.md`](../reports/validacao_iac.md).
+**E há evidência independente de que a direção está certa.** A inspeção visual de 25 células foi feita depois de as correções estarem especificadas, contra imagem de satélite e Street View: **17 `confere`, 8 `parcial`, nenhum `não confere`**, com os dez IAC baixos conferindo todos os dez — o extremo de que a hipótese H1 depende. Nenhum dos oito `parcial` é erro de cálculo; são limites de dado e de construto, todos registrados nas limitações. Ver [`../reports/validacoes/validacao_iac.md`](../reports/validacoes/validacao_iac.md).
 
 
 
