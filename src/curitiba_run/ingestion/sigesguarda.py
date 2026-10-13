@@ -19,20 +19,19 @@ Ver docs/taxonomia_ocorrencias.md para as regras de inclusão e os pesos.
 from __future__ import annotations
 
 import logging
-import re
-import unicodedata
 from pathlib import Path
 
 import pandas as pd
 
 from curitiba_run.config import (
-    BAIRRO_ALIASES,
     BAIRROS_CURITIBA,
+    LIMIAR_SUPRESSAO,
     OCORRENCIAS_INICIO,
     PROCESSED,
     RAW,
 )
 from curitiba_run.features import gravidade
+from curitiba_run.processing.bairros import ALIASES, chave, limpar_texto, normalizar_bairro
 
 log = logging.getLogger(__name__)
 
@@ -88,44 +87,10 @@ CLASSIFICACAO: dict[str, str | dict[str, str]] = {
 }
 
 
-# ------------------------------------------------------------------ texto
-
-
-def limpar_texto(valor) -> str | None:
-    """Espaços normais, sem sobra nas pontas, e vazio vira ausente.
-
-    A base usa espaço não separável (U+00A0) em "Importunação sexual". Sem isto,
-    a comparação exata falha e as 339 ocorrências somem sem erro nenhum.
-    """
-    if valor is None or (isinstance(valor, float) and pd.isna(valor)):
-        return None
-    texto = re.sub(r"\s+", " ", str(valor).replace("\xa0", " ")).strip()
-    return texto or None
-
-
-def chave(valor) -> str | None:
-    """Forma de comparação: sem acento, maiúscula, espaços normalizados."""
-    texto = limpar_texto(valor)
-    if texto is None:
-        return None
-    sem_acento = "".join(
-        c for c in unicodedata.normalize("NFKD", texto) if not unicodedata.combining(c)
-    )
-    return sem_acento.upper()
-
-
-_OFICIAIS = {chave(b): b for b in BAIRROS_CURITIBA}
-_ALIASES = {chave(k): v for k, v in BAIRRO_ALIASES.items()}
 _CLASSIFICACAO = {
     chave(nat): (alvo if isinstance(alvo, str) else {chave(s): t for s, t in alvo.items()})
     for nat, alvo in CLASSIFICACAO.items()
 }
-
-
-def normalizar_bairro(serie: pd.Series) -> pd.Series:
-    """Nome oficial do bairro, ou ausente se o nome não designa bairro de Curitiba."""
-    chaves = serie.map(chave)
-    return chaves.map(lambda k: _OFICIAIS.get(k) or _ALIASES.get(k))
 
 
 # ------------------------------------------------------------------ etapas
@@ -184,18 +149,30 @@ def classificar_natureza(df: pd.DataFrame) -> pd.DataFrame:
 def agregar_por_bairro(
     df: pd.DataFrame,
     estrategia: str = "minima",
-    limiar_baixa_contagem: int = 5,
+    limiar_baixa_contagem: int = LIMIAR_SUPRESSAO,
+    inicio: pd.Timestamp | str | None = None,
+    fim: pd.Timestamp | None = None,
 ) -> pd.DataFrame:
     """Uma linha por bairro oficial — os 75, inclusive os sem ocorrência.
 
     `gravidade` = Σ peso de cada ocorrência; `gravidade_anual` divide pelo
-    período coberto, para ser comparável entre versões da base.
+    período coberto, para ser comparável entre versões da base e entre fontes.
+    Serve a qualquer fonte que entregue `bairro`, `tipo` e `data`; a coluna
+    `equipamento_urbano` é da Guarda Municipal e é opcional.
+
+    `inicio` e `fim` delimitam o período; por padrão, do início do projeto à
+    última data da base. Fonte mensal deve passar `fim` como o último dia do
+    último mês, senão o período sai um mês curto e a taxa, inflada.
     """
     pesos = gravidade.pesos(estrategia)
     validas = df[df["tipo"].notna() & df["bairro"].notna()].copy()
     validas["peso"] = validas["tipo"].map(pesos)
+    if "equipamento_urbano" not in validas:
+        validas["equipamento_urbano"] = float("nan")
 
-    anos = (df["data"].max() - pd.Timestamp(OCORRENCIAS_INICIO)).days / 365.25
+    inicio = pd.Timestamp(inicio or OCORRENCIAS_INICIO)
+    fim = pd.Timestamp(fim) if fim is not None else df["data"].max()
+    anos = (fim - inicio).days / 365.25
 
     por_tipo = (
         validas.pivot_table(index="bairro", columns="tipo", values="peso", aggfunc="size", fill_value=0)
@@ -206,6 +183,7 @@ def agregar_por_bairro(
         n_ocorrencias=("tipo", "size"),
         gravidade=("peso", "sum"),
         pct_em_equipamento_urbano=("equipamento_urbano", "mean"),
+        # média de bool ou NaN; para fonte sem a coluna, fica ausente
     )
 
     tabela = (
@@ -248,7 +226,7 @@ def pipeline(
         .value_counts(dropna=False)
         .to_dict(),
         "recuperados_por_alias": int(
-            df["bairro_original"].map(chave).isin(_ALIASES).sum()
+            df["bairro_original"].map(chave).isin(ALIASES).sum()
         ),
         "por_tipo": interesse["tipo"].value_counts().to_dict(),
     }

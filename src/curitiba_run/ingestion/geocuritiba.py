@@ -405,6 +405,139 @@ def filtrar_areas_publicas(areas: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
     return publicas
 
 
+# ----------------------------------------------------------------- bairros
+
+# Serviços onde procurar a camada de bairros. O id da camada não é fixado: o
+# servidor do IPPUC reorganiza camadas entre versões, e um id errado baixaria
+# outra coisa em silêncio. A camada é localizada pelo nome e pelo tipo.
+SERVICOS_BAIRROS = (
+    f"{BASE}/GeoCuritiba/Publico_Interno_GeoCuritiba_BaseCartografica_para_MC/MapServer",
+    f"{BASE}/GeoCuritiba/Publico_Interno_GeoCuritiba_BaseTematica/MapServer",
+)
+ARQUIVO_BAIRROS = DESTINO / "bairros.parquet"
+
+
+# Os serviços públicos do GeoCuritiba não têm uma camada de bairros. Têm os
+# setores censitários de 2022, e no Censo 2022 cada setor pertence a um único
+# bairro: unir os setores pelo nome do bairro reconstrói os limites. A busca
+# tenta primeiro uma camada de bairros, caso o IPPUC publique uma, e cai para
+# os setores.
+PADROES_CAMADA_BAIRROS = (
+    r"bairro",
+    r"setor censit[aá]rio\s*-\s*2022",
+)
+
+
+def localizar_camada_de_bairros(
+    servicos: tuple[str, ...] = SERVICOS_BAIRROS,
+    padroes: tuple[str, ...] = PADROES_CAMADA_BAIRROS,
+) -> str:
+    """URL da primeira camada de polígonos que casa com um dos padrões, em ordem."""
+    import re
+
+    catalogo: list[tuple[str, dict]] = []
+    for servico in servicos:
+        try:
+            catalogo += [(servico, c) for c in _get_json(servico, {"f": "pjson"}).get("layers", [])]
+        except OSError as erro:
+            log.warning("Serviço inacessível: %s (%s)", servico, erro)
+
+    for padrao in padroes:
+        for servico, camada in catalogo:
+            if not re.search(padrao, camada["name"], re.IGNORECASE):
+                continue
+            if re.search(r"r[oó]tulo|label|texto|anota", camada["name"], re.IGNORECASE):
+                continue
+            url = f"{servico}/{camada['id']}"
+            if _get_json(url, {"f": "pjson"}).get("geometryType") == "esriGeometryPolygon":
+                log.info("Camada usada para os bairros: %s (%s)", camada["name"], url)
+                return url
+
+    raise LookupError(
+        "Nenhuma camada de bairros nem de setores censitários 2022. Camadas vistas: "
+        f"{sorted({c['name'] for _, c in catalogo})}. Salve uma malha de bairros em "
+        f"{ARQUIVO_BAIRROS} (ver docstring de `carregar_bairros`)."
+    )
+
+
+def _coluna_de_nome(gdf: gpd.GeoDataFrame) -> str:
+    """A coluna de texto cujos valores mais casam com os 75 bairros oficiais."""
+    import pandas as pd
+
+    from curitiba_run.processing.bairros import normalizar_bairro
+
+    # Texto pode vir como `object` ou, no pandas 3, como `str`: os dois servem.
+    melhores = {
+        coluna: normalizar_bairro(gdf[coluna]).notna().mean()
+        for coluna in gdf.columns
+        if coluna != "geometry"
+        and (gdf[coluna].dtype == object or pd.api.types.is_string_dtype(gdf[coluna]))
+    }
+    if not melhores or max(melhores.values()) < 0.9:
+        raise ValueError(
+            f"Nenhuma coluna com nomes de bairro reconhecíveis. Casamento por coluna: {melhores}"
+        )
+    return max(melhores, key=melhores.get)
+
+
+def padronizar_bairros(bruto: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Uma linha por bairro oficial, com o nome da lista oficial e geometria unida.
+
+    Falha alto se algum dos 75 bairros faltar ou se sobrar nome sem bairro —
+    os dois casos deixariam hexágonos sem nota ou com a nota errada.
+    """
+    from curitiba_run.config import BAIRROS_CURITIBA, IBGE_MUNICIPIO
+    from curitiba_run.processing.bairros import normalizar_bairro
+
+    # Malha nacional (a do IBGE, por exemplo): só Curitiba. Sem isto, todo
+    # "Centro" do país seria unido ao de Curitiba.
+    codigo = next((c for c in bruto.columns if c.upper() == "CD_MUN"), None)
+    if codigo is not None:
+        bruto = bruto[bruto[codigo].astype(str).str.strip() == IBGE_MUNICIPIO]
+
+    coluna = _coluna_de_nome(bruto)
+    gdf = bruto[[coluna, "geometry"]].copy()
+    gdf["bairro"] = normalizar_bairro(gdf[coluna])
+
+    sem_casar = sorted(gdf.loc[gdf["bairro"].isna(), coluna].astype(str).unique())
+    if sem_casar:
+        raise ValueError(f"Nomes da malha que não casam com a lista oficial: {sem_casar}.")
+
+    gdf["geometry"] = gdf.geometry.make_valid()
+    gdf = gdf.to_crs(CRS_METRICO).dissolve(by="bairro", as_index=False)[["bairro", "geometry"]]
+
+    ausentes = sorted(set(BAIRROS_CURITIBA) - set(gdf["bairro"]))
+    if ausentes:
+        raise ValueError(f"Bairros oficiais ausentes da malha: {ausentes}.")
+    return gdf
+
+
+def baixar_bairros(destino: Path = ARQUIVO_BAIRROS) -> gpd.GeoDataFrame:
+    """Baixa os limites oficiais de bairro do GeoCuritiba e grava em parquet."""
+    bruto = consultar_camada(localizar_camada_de_bairros())
+    bairros = padronizar_bairros(bruto)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    bairros.to_parquet(destino)
+    log.info("Bairros: %d polígonos, %.1f km²", len(bairros), bairros.area.sum() / 1e6)
+    return bairros
+
+
+def carregar_bairros(caminho: Path = ARQUIVO_BAIRROS, baixar_se_faltar: bool = True) -> gpd.GeoDataFrame:
+    """Limites de bairro: do disco se existir, senão do GeoCuritiba.
+
+    Se o servidor não estiver acessível, qualquer malha de bairros serve —
+    por exemplo a Malha de Bairros do Censo 2022 do IBGE —, desde que salva em
+    `data/raw/ippuc/` como `bairros.parquet`, `.gpkg`, `.geojson` ou `.shp`.
+    """
+    for alternativa in (caminho, *(caminho.with_suffix(s) for s in (".gpkg", ".geojson", ".shp"))):
+        if alternativa.exists():
+            gdf = gpd.read_file(alternativa) if alternativa.suffix != ".parquet" else gpd.read_parquet(alternativa)
+            return gdf if {"bairro", "geometry"} <= set(gdf.columns) and len(gdf) == 75 else padronizar_bairros(gdf)
+    if not baixar_se_faltar:
+        raise FileNotFoundError(f"Malha de bairros não encontrada em {caminho.parent}.")
+    return baixar_bairros(caminho)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     baixar_postes()

@@ -122,7 +122,8 @@ A base da Guarda mede **onde a Guarda atua**, não onde há risco: ela protege p
 
 | Fonte | Uso |
 |-------|-----|
-| IBGE — Censo Demográfico, setores censitários | População residente, densidade, renda domiciliar per capita, composição etária |
+| IBGE — Censo Demográfico 2022, setores censitários | População residente, densidade, renda domiciliar per capita, composição etária |
+| [IBGE — Censo 2022, Agregados por Bairros](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Agregados_por_Setores_Censitarios/Agregados_por_Bairro_csv/) | População por bairro — denominador da taxa de ocorrências |
 
 ---
 
@@ -250,7 +251,8 @@ Essa segunda leitura é o que responde P3 de forma direta e comunicável.
 
 - `src/curitiba_run/ingestion/sigesguarda.py`, `features/gravidade.py` e `scripts/fase2_ocorrencias.py`
 - `data/processed/ocorrencias_gm_por_bairro.csv`
-- `docs/taxonomia_ocorrencias.md` e ADRs 0004 e 0005
+- `docs/taxonomia_ocorrencias.md` e ADRs 0004, 0005 e 0007
+- `data/publicado/`: a camada por bairro e por hexágono, com supressão de baixa contagem
 - `reports/validacoes/qualidade_dados_seguranca.md` com o teste do viés de presença da Guarda
 
 **Critério de saída:** camada de risco por bairro, por habitante, com classe alto/baixo e com o viés de presença da Guarda medido — corrigido pela SESP-PR se a resposta vier, ou declarado como limitação se não vier.
@@ -384,7 +386,8 @@ curitiba-run/
 │
 ├── scripts/                          # pontos de entrada, um por etapa
 │   ├── fase1.py                      # limite → malhas H3 → GeoCuritiba → OSM → IAC
-│   └── fase2_ocorrencias.py          # ocorrências da Guarda → tabela por bairro
+│   ├── fase2_ocorrencias.py          # ocorrências da Guarda → taxa por bairro → hexágono
+│   └── mapas_evolucao.py             # um mapa por índice verificado, fase a fase
 │
 ├── src/curitiba_run/                 # o pacote: toda a lógica, testável
 │   ├── config.py                     # caminhos, pesos do IAC, os 75 bairros oficiais
@@ -393,19 +396,21 @@ curitiba-run/
 │   │   ├── geocuritiba.py            # postes, MDT e áreas verdes do IPPUC
 │   │   ├── ippuc.py                  # limite municipal
 │   │   ├── sigesguarda.py            # ocorrências da Guarda Municipal
-│   │   ├── sesp.py                   # bloqueado até o ADR da SESP-PR (pedido via LAI)
-│   │   ├── ibge.py
+│   │   ├── sesp.py                   # SESP-PR: pronto, só roda com o ADR 0006 (pedido via LAI)
+│   │   ├── ibge.py                   # população por bairro do Censo 2022
 │   │   └── dem.py
 │   ├── processing/
 │   │   ├── grid.py                   # malha H3 com verificação de cobertura
 │   │   ├── accessibility.py          # distância em rede
+│   │   ├── bairros.py                # nomes de bairro e bairro dominante de cada hexágono
+│   │   ├── supressao.py              # o que pode ser publicado (ADR 0007)
 │   │   ├── geocoding.py              # sem uso por ora: a base da Guarda não tem número
 │   │   └── spatial_join.py
 │   ├── features/
 │   │   ├── dimensions.py             # as cinco dimensões do IAC
 │   │   ├── suitability_index.py      # normalização, composição e robustez alto/baixo
 │   │   ├── gravidade.py              # peso de cada ocorrência pela pena mínima
-│   │   ├── risk_surface.py
+│   │   ├── risk_surface.py           # taxa por habitante, normalizada de 0 a 1
 │   │   └── typology.py               # quadrantes IAC × risco
 │   ├── analysis/                     # Moran/LISA, equidade, modelos
 │   └── viz/                          # mapas e gráficos
@@ -420,9 +425,13 @@ curitiba-run/
 │   ├── test_typology.py
 │   ├── test_equity.py
 │   ├── test_gravidade.py
-│   └── test_sigesguarda.py
+│   ├── test_sigesguarda.py
+│   ├── test_ibge.py
+│   ├── test_risk_surface.py
+│   ├── test_bairros_h3.py
+│   └── test_supressao.py
 │
-├── data/                             # nada aqui vai para o Git
+├── data/                             # só publicado/ vai para o Git
 │   ├── raw/                          # como baixado, nunca editado à mão
 │   │   ├── osm/
 │   │   ├── ippuc/
@@ -431,7 +440,8 @@ curitiba-run/
 │   │   ├── ibge/
 │   │   └── dem/
 │   ├── interim/                      # cache do osmnx e arquivos temporários
-│   └── processed/                    # malhas H3, IAC, ocorrências por bairro
+│   ├── processed/                    # malhas H3, IAC, ocorrências por bairro — completo, privado
+│   └── publicado/                    # o que passou pela supressão (ADR 0007)
 │
 ├── docs/
 │   ├── indice_adequacao.md           # método da Fase 1: o IAC
@@ -443,7 +453,8 @@ curitiba-run/
 │       ├── 0002-sem-dependencia-strava.md
 │       ├── 0003-alto-baixo-como-unidade-de-comunicacao.md
 │       ├── 0004-base-legal-dados-de-ocorrencias.md
-│       └── 0005-peso-de-gravidade-pela-pena-minima.md
+│       ├── 0005-peso-de-gravidade-pela-pena-minima.md
+│       └── 0007-supressao-de-baixa-contagem.md
 │
 ├── reports/
 │   ├── status/                       # situação de cada fase e backlog
@@ -472,7 +483,7 @@ curitiba-run/
 ### Política de dados
 
 - `data/raw/`, `data/interim/` e `data/processed/` não vão para o Git. Os scripts recriam tudo a partir das fontes públicas.
-- **Dado de ocorrência nunca é publicado bruto** — só agregado, e com supressão de contagens baixas ([ADR 0004](docs/adr/0004-base-legal-dados-de-ocorrencias.md)).
+- **Dado de ocorrência nunca é publicado bruto** — só agregado por bairro, e bairro com menos de 5 ocorrências sai sem valor ([ADR 0004](docs/adr/0004-base-legal-dados-de-ocorrencias.md), [ADR 0007](docs/adr/0007-supressao-de-baixa-contagem.md)). Contagem por tipo só sai para a cidade inteira.
 - O material de inspeção manual (`reports/validacoes/*.html`) é privado e fica só na máquina local.
 - **Nenhum dado do projeto depende de acesso privilegiado** — com a exceção declarada da SESP-PR, solicitada via LAI.
 
@@ -480,11 +491,11 @@ curitiba-run/
 
 ## Desafios
 
-O registro dos obstáculos que mudaram o projeto está em [`docs/desafios.md`](docs/desafios.md) — dezenove deles, com o que cada um ensinou.
+O registro dos obstáculos que mudaram o projeto está em [`docs/desafios.md`](docs/desafios.md) — vinte deles, com o que cada um ensinou.
 
 Vale a leitura por um motivo específico: **nenhum desses defeitos se manifestou como erro.** A licença da Strava não gerou exceção; a métrica sem janela temporal teria somado normalmente; três dimensões quebradas do índice devolveram 4.508 valores bem-comportados; a malha que perdia 1% do município fechava todas as contas. Só a serialização do Parquet realmente quebrou — e foi o mais fácil de corrigir.
 
-O que encontrou os outros dezoito foi ler a licença, checar a correlação entre dimensões, conferir somas de controle e perguntar em que direção cada erro empurraria o resultado. Nada disso aparece num pipeline verde.
+O que encontrou os outros foi ler a licença, checar a correlação entre dimensões, conferir somas de controle e perguntar em que direção cada erro empurraria o resultado. Nada disso aparece num pipeline verde.
 
 ---
 
@@ -512,7 +523,23 @@ python scripts/fase1.py --so-malha   # só as malhas, dispensa internet
 python scripts/fase2_ocorrencias.py
 ```
 
-Lê a base da Guarda Municipal salva em `data/raw/sigesguarda/` (baixada do [Portal de Dados Abertos](https://dadosabertos.curitiba.pr.gov.br/)), mantém só as ocorrências de interesse, aplica o peso de gravidade e grava `data/processed/ocorrencias_gm_por_bairro.csv`. Não precisa de internet.
+Três etapas:
+
+1. Lê a base da Guarda Municipal em `data/raw/sigesguarda/` (baixada do [Portal de Dados Abertos](https://dadosabertos.curitiba.pr.gov.br/)), mantém só as ocorrências de interesse, aplica o peso de gravidade e grava `data/processed/ocorrencias_gm_por_bairro.csv`.
+2. Divide pela população do Censo 2022 e normaliza de 0 a 1 → `data/processed/taxa_ocorrencias_gm_por_bairro.csv`. Precisa do `Agregados_por_bairros_basico_BR_*.zip` do [FTP do IBGE](https://ftp.ibge.gov.br/Censos/Censo_Demografico_2022/Agregados_por_Setores_Censitarios/Agregados_por_Bairro_csv/) em `data/raw/ibge/`; sem ele, a etapa 1 roda e a 2 avisa o que falta.
+3. Passa a taxa para a malha H3: cada hexágono herda a nota do bairro dominante → `data/processed/risco_gm_h3_r9.parquet`. Na primeira vez, baixa os limites de bairro do GeoCuritiba — é a única etapa que usa internet.
+
+**SESP-PR.** Se houver um arquivo em `data/raw/sesp/` **e** um `docs/adr/0006-*.md` com a base legal, o mesmo comando roda as três etapas também para a SESP (`*_sesp_*`), compara as duas fontes em `comparacao_gm_sesp_por_bairro.csv` e usa a SESP como camada de risco do projeto. Sem o ADR, a SESP é pulada com aviso. Em qualquer caso, `risco_h3_r9.parquet` é a camada de risco a usar nas fases seguintes. O roteiro de chegada está em [`fase2_status.md`](reports/status/fase2_status.md#quando-a-resposta-chegar).
+
+**Publicação.** Por fim, o script grava em `data/publicado/` a versão que pode sair do projeto ([ADR 0007](docs/adr/0007-supressao-de-baixa-contagem.md)): `risco_gm_por_bairro.csv`, `risco_gm_h3_r9.csv` e `ocorrencias_gm_por_tipo_curitiba.csv`. Bairro com menos de 5 ocorrências sai sem valor, e nenhuma contagem por tipo sai por bairro. Antes de gravar, uma verificação para o script se algo identificável escapou.
+
+### Mapas da evolução
+
+```bash
+python scripts/mapas_evolucao.py
+```
+
+Gera em `reports/figures/evolucao/` um mapa por índice verificado — as cinco dimensões e o IAC, a classe alto/baixo, a robustez entre cenários de peso, a taxa de ocorrências e a sua classe, e, quando houver SESP, as mesmas duas para ela e a comparação com a Guarda —, mais um painel que põe as fases lado a lado. Mapa cujo insumo ainda não existe é pulado; rodar de novo ao fim de cada fase acrescenta os novos. Os mapas de ocorrências já saem com a supressão do ADR 0007: bairro com menos de 5 ocorrências aparece hachurado. Os PNGs ficam fora do Git pelo tamanho; os da SESP só podem sair do projeto se o ADR 0006 permitir.
 
 ### Preparando o ambiente
 
@@ -665,6 +692,7 @@ Fora da v1, mas contempladas pela arquitetura.
 - Extensão a outras capitais com dados abertos equivalentes, transformando o IAC em índice comparável.
 - Inclusão de caminhada e ciclismo, ampliando de corrida para mobilidade ativa.
 - GWR / MGWR para heterogeneidade espacial dos coeficientes.
+- **Denominador de exposição para a taxa de ocorrências** — recalcular por km de via caminhável e por área, e marcar os bairros cuja classe alto/baixo depende do denominador. Mediria o efeito dos bairros de passagem (Centro, São Francisco, Jardim Botânico), hoje declarado como limitação.
 
 ---
 

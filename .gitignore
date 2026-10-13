@@ -5,7 +5,7 @@ data/processed/*
 !data/**/.gitkeep
 
 # Saídas pesadas
-reports/figures/*.png
+reports/figures/**/*.png
 
 # Material privado de inspeção — fica só na máquina local
 reports/validacoes/*.html

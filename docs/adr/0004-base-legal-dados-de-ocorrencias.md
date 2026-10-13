@@ -29,6 +29,7 @@ Não há exigência formal de citar a fonte. O projeto cita mesmo assim.
 1. **Só entram bases publicadas pelo portal municipal.** O Decreto nº 1023/2014 cobre a Administração Direta, Indireta e Autarquias de Curitiba — a Guarda Municipal (SIGESGUARDA) está dentro. **Os dados da SESP-PR não estão**: são do governo estadual e têm termos próprios. Nenhuma base estadual entra no projeto antes de um ADR próprio com a base legal dela.
 2. **O dado bruto não é publicado.** Registro de ocorrência com endereço é dado pessoal em potencial, e a Lei Geral de Proteção de Dados (Lei nº 13.709/2018) é justamente uma das "restrições legais" a que as Regras de Utilização remetem — e é posterior ao decreto. O repositório publica apenas agregados por célula H3. O `.gitignore` já exclui `data/raw/`.
 3. **Células com contagem muito baixa são suprimidas ou suavizadas antes de publicar.** "Uma ocorrência neste hexágono, neste mês" pode identificar uma vítima. O limiar de supressão é decidido e documentado na própria Fase 2, antes do primeiro mapa.
+   *Atualização:* decidido no [ADR 0007](0007-supressao-de-baixa-contagem.md) — 5 ocorrências, por **bairro**, e não por célula: a base não tem coordenada, e cada hexágono só repete a nota do seu bairro.
 
 ## Justificativa
 

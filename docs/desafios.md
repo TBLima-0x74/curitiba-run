@@ -268,6 +268,24 @@ Nos três casos o pipeline rodaria até o fim e entregaria uma tabela plausível
 
 **O que ensinou:** comparar a base com uma referência externa — aqui, a lista oficial de bairros — é o que expõe o que falta. Olhar só o que casou nunca mostra o que não casou. E, de novo, vale perguntar em que direção a perda empurra o resultado: os três defeitos subestimariam o risco onde a hipótese do projeto espera encontrá-lo.
 
+### 20. Duas fontes oficiais, dois contornos de Curitiba
+
+Para passar a nota de cada bairro aos hexágonos, era preciso o polígono dos bairros. Dois obstáculos apareceram em sequência.
+
+**O primeiro: não há camada de bairros.** A busca percorreu as cerca de 120 camadas dos serviços públicos do GeoCuritiba e não encontrou nenhuma com "bairro" no nome. Havia, porém, os **setores censitários de 2022** — e no Censo 2022 cada setor pertence a um único bairro. Unir os setores pelo nome do bairro reconstruiu os 75 limites. O código procura a camada pelo nome e pelo tipo de geometria, nunca por um número fixo, e foi isso que permitiu trocar de fonte sem reescrever nada além da regra de busca.
+
+**O segundo: 37 hexágonos sem bairro nenhum.** A atribuição parou com erro. A malha H3 da Fase 1 foi recortada pelo limite municipal do **IBGE**; os setores seguem o limite **oficial do IPPUC**. As áreas quase coincidem — 435,4 km² contra 434,9 km² —, mas os contornos não: divergem em média **80 m** ao longo dos 110 km de divisa. Os 37 hexágonos são de borda, com a maior parte da área fora da cidade, e o pedaço que ficava dentro pelo IBGE caía na faixa em que os dois contornos discordam.
+
+**Antes da correção, a hipótese mais grave foi testada primeiro.** O deslocamento entre os centroides dos dois contornos era de 65 m, valor típico de um erro de datum — dado em SAD69 lido como SIRGAS 2000. Se fosse isso, o problema não seria da Fase 2: postes, áreas verdes e declividade da Fase 1 vieram do mesmo servidor, e todo o IAC estaria deslocado. A verificação comparou parques grandes do IPPUC com os mesmos parques no OpenStreetMap: **deslocamento nulo**, sobreposição mediana de 97,7%. O IPPUC está certo; o contorno do IBGE é que é generalizado. E transladar os bairros pelos 65 m reduziu a diferença entre os contornos só de 9,1 para 8,0 km², confirmando que não era um deslocamento rígido, e sim forma.
+
+**Correção:** hexágono de borda que não toca nenhum bairro recebe o mais próximo — estavam a no máximo 177 m — e fica marcado em `bairro_por_proximidade`. Acima de 500 m o pipeline para, porque aí as duas malhas já não descreveriam o mesmo território. Resultado: as 4.508 células com bairro e os 75 bairros no mapa.
+
+**O que ficou de fora, e por que se aceitou:** com o limite oficial como referência, **0,55 km² da cidade (0,13%) fica fora da malha H3** — acima da tolerância de 0,1% do desafio 9. Medido antes de decidir: são 61 faixas estreitas ao longo da divisa, com largura típica de 24 m, espalhadas por 17 bairros periféricos — no máximo 1,3% da área de um bairro — e cerca de 1.200 moradores estimados, 0,07% da cidade. No desafio 9 a perda era de 4,1 km² e decidia quais células existiam; aqui é a borda externa de células que já existem. A camada de risco, que é por bairro, não é afetada. Refazer as malhas e o IAC da Fase 1 por isso não se justificava, e a divergência ficou declarada como limitação.
+
+**O que ensinou:** "o limite de Curitiba" nunca foi uma coisa só. Duas fontes oficiais e corretas, cada uma em sua escala, desenham a cidade com 80 m de diferença — e o projeto usava uma sem saber que a outra existia. Toda junção entre camadas de fontes diferentes carrega essa pergunta: as duas descrevem o mesmo território? E quando um desvio tem a cara de um erro grave, vale testar o erro grave primeiro: aqui, ele teria invalidado a fase anterior inteira, e foi descartado em uma verificação.
+
+Este é também o primeiro desafio que **se manifestou como erro** — e só porque a checagem existia. Sem a regra de parar quando um hexágono fica sem bairro, os 37 teriam saído do mapa em silêncio, todos na periferia.
+
 ## O risco que continua aberto
 
 Nenhuma correção eliminou o **R1**, que segue sendo a ameaça central à validade.
@@ -282,10 +300,10 @@ A descoberta do ArcGIS Server público do IPPUC destravou a referência que falt
 
 ## O padrão
 
-Dezenove desafios, e a recorrência importa mais que qualquer um deles: **nenhum se manifestou como erro.**
+Vinte desafios, e a recorrência importa mais que qualquer um deles: **quase nenhum se manifestou como erro.**
 
-A licença não gerou exceção. O `effort_count` sem janela teria somado normalmente. O viés da amostra produziria coeficientes com intervalo de confiança estreito. As três dimensões quebradas devolveram 4.508 valores bem-comportados. A malha com lacuna fechou todas as contas. Só o Parquet realmente quebrou — e foi o mais fácil de todos.
+A licença não gerou exceção. O `effort_count` sem janela teria somado normalmente. O viés da amostra produziria coeficientes com intervalo de confiança estreito. As três dimensões quebradas devolveram 4.508 valores bem-comportados. A malha com lacuna fechou todas as contas. Só o Parquet realmente quebrou sozinho — e foi o mais fácil de todos. O desafio 20 também parou o pipeline, mas porque uma checagem escrita de antemão o obrigou a parar.
 
-O trabalho que encontrou os outros dezoito foi **ler a licença, checar a correlação entre dimensões, conferir somas de controle, perguntar em que direção cada erro empurraria o resultado — e olhar um lugar que se conhece e estranhar o número**. Nada disso aparece em um pipeline verde.
+O trabalho que encontrou os outros foi **ler a licença, checar a correlação entre dimensões, conferir somas de controle, perguntar em que direção cada erro empurraria o resultado — e olhar um lugar que se conhece e estranhar o número**. Nada disso aparece em um pipeline verde.
 
 É por isso que a Fase 1 incluía uma etapa de validação explícita, e por que ela consumiu mais tempo que a implementação.

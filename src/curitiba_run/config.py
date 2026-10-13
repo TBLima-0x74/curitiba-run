@@ -148,7 +148,16 @@ BAIRROS_CURITIBA = (
 BAIRRO_ALIASES = {
     "CIDADE INDUSTRIAL": "Cidade Industrial de Curitiba",
     "CIC": "Cidade Industrial de Curitiba",
+    # O IBGE (Censo 2022) grafa com "o"; a Prefeitura e a Guarda, com "u".
+    "BOTIATUVINHA": "Butiatuvinha",
 }
 
 # 2022 só tem novembro e dezembro na base da Guarda Municipal.
 OCORRENCIAS_INICIO = "2023-01-01"
+
+# Supressão antes de publicar (ADR 0007): bairro com menos ocorrências que isto
+# não tem valor publicado. Vale também para contagens da cidade por tipo.
+LIMIAR_SUPRESSAO = 5
+
+# Só o que passou pela supressão. É a única pasta de dados versionada.
+PUBLICADO = DATA / "publicado"
