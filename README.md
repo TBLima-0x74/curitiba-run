@@ -649,24 +649,40 @@ As duas primeiras são **ameaças à validade**, não riscos de execução: são
 
 ### Branches
 
+Projeto de uma pessoa só: o trabalho vai direto para `main`, que deve estar **sempre reproduzível**: os testes passam antes de cada push.
+
 ```
-main                    # sempre reproduzível
-feat/<descricao>        # nova funcionalidade
-fix/<descricao>         # correção
-data/<descricao>        # nova fonte ou atualização de base
-docs/<descricao>        # documentação
-exp/<descricao>         # experimento analítico
+main               # padrão: todo o trabalho
+exp/<descricao>    # só para experimento analítico que pode ser descartado
 ```
 
 ### Commits — Conventional Commits
 
+Vale **a partir da Fase 2**. O primeiro commit, da Fase 1, é anterior à convenção e fica como está: reescrever histórico público não compensa.
+
 ```
-feat(features): compõe o índice de adequação com seis dimensões
-fix(processing): corrige projeção no cálculo de declividade
+<tipo>(<escopo>): <o que muda, no presente>
+```
+
+Tipos: `feat`, `fix`, `data` (nova fonte ou atualização de base), `docs`, `test`, `chore`. O escopo é o módulo, a fase ou o documento — `risk_surface`, `fase2`, `adr`.
+
+```
+feat(risk_surface): suaviza a taxa por Bayes empírico
+fix(ibge): aceita a grafia "Botiatuvinha" do Censo 2022
 data(sigesguarda): atualiza base de ocorrências
-docs(readme): detalha a tipologia de quadrantes
-test(accessibility): cobre distância em rede com grafo sintético
+docs(adr): registra a supressão de baixa contagem (ADR 0007)
+test(supressao): cobre a supressão complementar
 chore(ci): configura workflow de lint
+```
+
+**Um commit por entrega é o ideal, não a regra.** O commit acontece quando há um ponto de parada, e esse ponto pode chegar depois de várias entregas. Nesse caso, um só commit junta todas: o título leva o tipo e o escopo da mudança principal, e o corpo traz uma linha por entrega.
+
+```
+feat(fase2): taxa por habitante, Bayes empírico e supressão (ADR 0007)
+
+- taxa de gravidade por 100 mil, em escala log, com classe alto/baixo
+- suavização bayesiana empírica (Marshall, 1991)
+- supressão de bairro com menos de 5 ocorrências
 ```
 
 ### Notebooks
